@@ -21,7 +21,7 @@
       high-severity advisories to save an upgrade is not a trade worth making.
       Keep this current, and treat a new NU1903 here as a release blocker.
     -->
-    <PackageReference Include="Scriban" Version="7.2.6" />
+    <PackageReference Include="Scriban" Version="7.5.0" />
   </ItemGroup>
 
 </Project>
