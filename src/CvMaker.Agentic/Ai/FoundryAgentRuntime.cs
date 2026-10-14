@@ -9,10 +9,9 @@ namespace CvMaker.Agentic.Ai;
 /// <summary>
 /// Azure AI Foundry backend.
 ///
-/// Agents are created on first use and reused for the life of the process; each
-/// invocation creates a thread and deletes it again. Nothing deletes the agents
-/// themselves, so every process start leaves a fresh set in the Foundry project
-/// (they hold instructions only, no user data). A CV generation is a one-shot pipeline — there is no
+/// Agents are created on first use and reused by their versioned name, including
+/// across process restarts; each invocation creates a thread and deletes it again.
+/// The agents hold instructions only, no user data. A CV generation is a one-shot pipeline — there is no
 /// multi-turn conversation to resume — so the thread has no value past the
 /// reply, and it holds the pasted job posting and the user's profile facts
 /// verbatim on Azure's side.
@@ -206,14 +205,22 @@ public sealed class FoundryAgentRuntime : IAgentRuntime
         var key = $"{agent.Slug}@{agent.Version}";
         if (_provisioned.TryGetValue(key, out var existing)) return existing;
 
-        // Temperature is declared in definition.json but not passed here, so the
-        // Foundry backend ignores it. CreateAgentAsync does accept one (checked
-        // against Azure.AI.Agents.Persistent 1.1.0); wiring it up is a known
-        // follow-up, not something the SDK prevents.
+        await foreach (var provisioned in _client!.Administration.GetAgentsAsync(
+            order: ListSortOrder.Descending,
+            cancellationToken: ct))
+        {
+            if (!string.Equals(provisioned.Name, key, StringComparison.Ordinal)) continue;
+
+            _provisioned[key] = provisioned.Id;
+            _logger.LogInformation("Reusing Foundry agent {Key} as {Id}", key, provisioned.Id);
+            return provisioned.Id;
+        }
+
         var created = (await _client!.Administration.CreateAgentAsync(
             model:        string.IsNullOrWhiteSpace(agent.Model) ? _fallbackModel : agent.Model,
             name:         key,
             instructions: agent.Instructions,
+            temperature:  agent.Temperature,
             cancellationToken: ct)).Value;
 
         var id = created.Id;
