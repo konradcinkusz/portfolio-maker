@@ -13,7 +13,7 @@ COPY src/CvMaker.Web/ src/CvMaker.Web/
 RUN dotnet publish src/CvMaker.Web/CvMaker.Web.csproj -c Release -o /app/publish --no-restore
 
 
-FROM nginx:1.27-alpine AS final
+FROM nginx:1.29-alpine AS final
 LABEL org.opencontainers.image.source=https://github.com/konradcinkusz/portfolio-maker
 
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html
